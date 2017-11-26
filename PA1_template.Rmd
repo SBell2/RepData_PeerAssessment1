@@ -1,25 +1,167 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Reproducible Research: Peer Assessment #1'
+output: html_document
+keep_md : true
 ---
-
-
 ## Loading and preprocessing the data
 
+```{r load packages and data, echo=TRUE}
+#load packages that may be useful for analysis
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(xtable)
+
+#After forking and cloning the repository, set the working directory to the local copy of the repository. Unzip the file and then read the csv into R. The date is reformatted. 
+
+unzip("activity.zip")
+activity<-read.csv("activity.csv")
+
+activity$date<-ymd(activity$date)
+```
 
 
-## What is mean total number of steps taken per day?
+## What is the mean total number of steps taken per day?
+
+Across all days, the median and average are very close with a mean steps take per day of 10,766.17 and median of 10,765. However, the table below stark differences across days, with many having a median value of 0. 
+
+```{r, results="asis"}
+#Code will make the sum total of steps taken per day, then a histogram of the number of steps per day with the base plotting system, and finally produce a table of the mean and median steps per day
+
+activity_by_day<-activity%>%
+        group_by(date)%>%
+        summarise(steps=sum(steps))
 
 
+#overall mean across days
+mean(activity_by_day$steps, na.rm=TRUE)
+
+#overall median across days
+median(activity_by_day$steps, na.rm=TRUE)
+
+
+hist(activity_by_day$steps, xlab="Number of steps", main="Histogram of Daily Steps")
+
+#The dates will be converted into a character so they work in the xtable
+mean_and_median_steps<-activity%>%
+        group_by(as.character(date))%>%
+        summarise(mean=mean(steps, na.rm=TRUE),
+                  median=median(steps, na.rm=TRUE))
+
+
+
+mean_and_median_steps<-xtable(mean_and_median_steps, digits=0)
+
+print(mean_and_median_steps, type="html", include.rownames = FALSE)
+
+
+```
+
+
+
+The chart above shows a histogram of the number of the total number of steps per day. The table produced shows the mean and median number of steps. Those days without data are shown as blanks in the resulting table.
 
 ## What is the average daily activity pattern?
 
+```{r}
+mean_interval<-activity%>%
+        group_by(interval)%>%
+        summarise(mean_steps=mean(steps, na.rm=TRUE))
+
+plot(x=mean_interval$interval, y=mean_interval$mean_steps, type="l", xlab="interval", ylab="average steps", main="Average steps by 5-minute interval")
+abline(v=835)
 
 
-## Imputing missing values
+```
+
+
+Based on the plot above, the interval with the highest number of steps is the 835th.  
+
+
+##Imputing missing values
+
+As seen in the table by day, there are several data points missing (2,304 to be exact). These will be updated using the average for that 5-minute interval.
+
+Once updated, the mean and median remained effectively the same. 
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r, results="asis"}
+#Count the number of intervals with missing values
+sum(is.na(activity$steps))
+
+
+#merge the mean dataframe and the original activity. Then update missing values with the mean for the period.
+
+mean_interval<-data.frame(mean_interval)
+activity_update<-merge(activity, mean_interval, by.x = "interval"
+      ,by.y="interval")
+
+activity_update$steps<-ifelse(is.na(activity_update$steps), activity_update$mean_steps,
+                              activity_update$steps)
+
+
+#Sum the total steps per day
+activity_update_day<-activity_update%>%
+        group_by(date)%>%
+        summarise(steps=sum(steps))
+
+#Produce an updated histogram of steps
+hist(activity_update_day$steps, main="Updated Histogram of daily steps", xlab="Steps")
+
+#Updated daily mean
+
+mean(activity_update_day$steps)
+
+# Updated daily median
+
+median(activity_update_day$steps)
+
+
+#Updated table of the mean and median per day
+
+Updated_mean_and_median_steps<-activity_update%>%
+        group_by(as.character(date))%>%
+        summarise(mean=mean(steps, na.rm=TRUE), median=median(steps, na.rm=TRUE))
+
+Updated_mean_and_median_steps<-xtable(Updated_mean_and_median_steps, digits=0)
+print(Updated_mean_and_median_steps, type="html", include.rownames = FALSE)
+
+
+
+
+
+
+```
+
+The median data point is now higher for several days once NA data has been updated. 
+
+##Are there differences in activity patterns between weekdays and weekends?
+
+While weekends do not have the large spike, they have generally more steps across periods.
+
+
+```{r}
+
+#create a variable that indicates whether it is a weekday or weekend. 
+
+activity_update$day.of.week<-weekdays(activity_update$date)
+activity_update$weekend<-ifelse(activity_update$day.of.week
+                                =="Saturday"| activity_update$day.of.week=="Sunday", "weekend", "weekday")
+
+daily_updated<-activity_update%>%
+        group_by(interval, weekend)%>%
+        summarise(steps=mean(steps))%>%
+        ggplot(aes(x=interval,y=steps))+geom_line()+facet_grid(.~weekend)
+
+daily_updated
+
+
+
+```
+
+
+
+

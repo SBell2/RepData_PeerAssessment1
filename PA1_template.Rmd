@@ -44,6 +44,8 @@ median(activity_by_day$steps, na.rm=TRUE)
 
 hist(activity_by_day$steps, xlab="Number of steps", main="Histogram of Daily Steps")
 
+
+
 #The dates will be converted into a character so they work in the xtable
 mean_and_median_steps<-activity%>%
         group_by(as.character(date))%>%
